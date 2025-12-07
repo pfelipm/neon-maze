@@ -392,7 +392,7 @@ export default function App() {
             setGameState(GameState.LEVEL_START);
             setTimeout(() => {
                 setGameState(GameState.PLAYING);
-            }, 2500);
+            }, 2000); // Reduced from 2500ms for better pacing
          }, 2000);
       }
     }
@@ -440,7 +440,7 @@ export default function App() {
     setGameState(GameState.LEVEL_START);
     setTimeout(() => {
         setGameState(GameState.PLAYING);
-    }, 2500);
+    }, 2000); // Reduced from 2500ms for better pacing
   };
 
   // Input Handling
@@ -660,8 +660,7 @@ export default function App() {
                 WARNING: {getModifierName()}
              </div>
            )}
-
-           <p className="mt-8 text-sm text-gray-500 animate-pulse">READY?</p>
+           {/* READY? text removed to prevent sequence overlap */}
         </div>
       )}
 

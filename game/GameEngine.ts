@@ -64,9 +64,9 @@ export class GameEngine {
   }
 
   resetPositions() {
-    // Freeze movement for 2.5 seconds on reset (Increased from 2.0 to ensure READY is visible/audible)
+    // Freeze movement for 2.5 seconds on reset to prevent jitter and give "Ready" time
     this.startTimer = 2.5;
-    this.countdownStage = 'READY'; 
+    this.countdownStage = 'READY'; // Reset sound stage so it plays in update loop
 
     // Determine speed based on modifier
     let playerSpeed = MOVEMENT_SPEED + (this.level * 0.01);
