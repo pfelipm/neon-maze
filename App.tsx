@@ -1,13 +1,13 @@
+
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GameEngine } from './game/GameEngine';
-import { GameState, TileType, GhostState, Direction, LevelModifier } from './types';
+import { GameState, TileType, GhostState, Direction, LevelModifier, ItemType } from './types';
 import { BASE_MAP, TILE_SIZE, THEMES, MAP_HEIGHT, MAP_WIDTH } from './constants';
 import { VirtualJoystick } from './components/VirtualJoystick';
 import { audioManager } from './utils/audio';
 
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  // Lazy initialize engine to avoid heavy lifting/errors during initial render pass
   const engineRef = useRef<GameEngine | null>(null);
   
   const requestRef = useRef<number>();
@@ -16,22 +16,20 @@ export default function App() {
   const [lives, setLives] = useState(3);
   const [level, setLevel] = useState(1);
   const [highScore, setHighScore] = useState(0);
+  const [inventory, setInventory] = useState<ItemType>(ItemType.NONE);
   
-  // New: User selected theme index
   const [selectedThemeIndex, setSelectedThemeIndex] = useState(0);
 
   // Initialize Game Loop
   const animate = useCallback(() => {
-    // Ensure engine exists
     if (!engineRef.current) {
         engineRef.current = new GameEngine();
     }
     const engine = engineRef.current;
     
-    // Only update game logic if strictly playing
     if (gameState === GameState.PLAYING) {
       try {
-        engine.update(0.016); // Fixed time step approx 60fps
+        engine.update(0.016); 
       } catch (e) {
         console.error("Game Loop Error:", e);
       }
@@ -57,23 +55,23 @@ export default function App() {
       }
     }
 
-    // Sync React State periodically (every ~10 frames)
+    // Sync React State periodically
     if (Math.random() < 0.1) {
        setScore(engine.score);
        setLives(engine.lives);
        setLevel(engine.level);
+       setInventory(engine.player.inventory);
     }
 
     draw();
     requestRef.current = requestAnimationFrame(animate);
-  }, [gameState, selectedThemeIndex]); // Add selectedThemeIndex to dependency
+  }, [gameState, selectedThemeIndex]);
 
   useEffect(() => {
     requestRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(requestRef.current!);
   }, [animate]);
 
-  // Initialize and handle Resize
   useEffect(() => {
     const handleResize = () => {
        if (canvasRef.current) {
@@ -82,7 +80,7 @@ export default function App() {
        }
     };
     window.addEventListener('resize', handleResize);
-    handleResize(); // Init size
+    handleResize(); 
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
@@ -107,7 +105,6 @@ export default function App() {
         return;
       }
       
-      // Don't process movement if paused
       if (gameState === GameState.PAUSED) return;
 
       const engine = engineRef.current;
@@ -118,6 +115,10 @@ export default function App() {
         case 'ArrowDown': engine.player.nextDir = 'DOWN'; break;
         case 'ArrowLeft': engine.player.nextDir = 'LEFT'; break;
         case 'ArrowRight': engine.player.nextDir = 'RIGHT'; break;
+        case ' ': // Spacebar for Item
+          engine.activateItem();
+          setInventory(ItemType.NONE); // Optimistic UI update
+          break;
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -126,7 +127,7 @@ export default function App() {
 
   const startGame = () => {
     audioManager.init();
-    audioManager.resume(); // Vital for Chrome/Safari autoplay policies
+    audioManager.resume(); 
     
     if (!engineRef.current) engineRef.current = new GameEngine();
     const engine = engineRef.current;
@@ -135,7 +136,6 @@ export default function App() {
     engine.lives = 3;
     engine.resetLevel(1);
     
-    // Go to Level Start sequence first
     setGameState(GameState.LEVEL_START);
     setTimeout(() => {
         setGameState(GameState.PLAYING);
@@ -145,6 +145,13 @@ export default function App() {
   const handleJoystickDir = (dir: Direction) => {
     if (engineRef.current && gameState === GameState.PLAYING) {
       engineRef.current.player.nextDir = dir;
+    }
+  };
+
+  const handleMobileAction = () => {
+    if (engineRef.current && gameState === GameState.PLAYING) {
+        engineRef.current.activateItem();
+        setInventory(ItemType.NONE);
     }
   };
 
@@ -158,11 +165,9 @@ export default function App() {
     if (!engineRef.current) return;
     const engine = engineRef.current;
     
-    // Apply theme based on user selection + level offset
     const currentThemeIndex = (selectedThemeIndex + engine.level - 1) % THEMES.length;
     const theme = THEMES[currentThemeIndex];
 
-    // Clear with trail effect
     ctx.fillStyle = theme.bgColor;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -180,7 +185,6 @@ export default function App() {
     ctx.shadowBlur = 10;
     ctx.shadowColor = theme.wallColor;
     
-    // Safety check for map
     if (engine.map && engine.map.length > 0) {
         const rows = engine.map.length;
         const cols = engine.map[0].length;
@@ -194,13 +198,10 @@ export default function App() {
             if (tile === TileType.WALL) {
               ctx.strokeRect(px + 4, py + 4, TILE_SIZE - 8, TILE_SIZE - 8);
             } else if (tile === TileType.DOT) {
-              // Blinking Dots Modifier
               let alpha = 1.0;
               if (engine.modifier === LevelModifier.BLINKING_DOTS) {
-                  // Random flicker or sinusoidal wave
                   alpha = 0.3 + 0.7 * Math.abs(Math.sin((Date.now() / 300) + x + y));
               }
-
               ctx.globalAlpha = alpha;
               ctx.fillStyle = theme.dotColor;
               ctx.shadowBlur = 5;
@@ -209,9 +210,8 @@ export default function App() {
               ctx.arc(px + TILE_SIZE/2, py + TILE_SIZE/2, 2, 0, Math.PI * 2);
               ctx.fill();
               ctx.globalAlpha = 1.0;
-
             } else if (tile === TileType.POWER_PELLET) {
-              if (Math.floor(Date.now() / 200) % 2 === 0) { // Blink
+              if (Math.floor(Date.now() / 200) % 2 === 0) {
                   ctx.fillStyle = theme.dotColor;
                   ctx.shadowBlur = 15;
                   ctx.shadowColor = theme.dotColor;
@@ -219,6 +219,32 @@ export default function App() {
                   ctx.arc(px + TILE_SIZE/2, py + TILE_SIZE/2, 6, 0, Math.PI * 2);
                   ctx.fill();
               }
+            } else if (tile === TileType.ITEM_SPEED) {
+               // Draw Speed Bolt
+               ctx.fillStyle = '#00ffff';
+               ctx.shadowColor = '#00ffff';
+               ctx.shadowBlur = 15;
+               ctx.beginPath();
+               ctx.moveTo(px + TILE_SIZE * 0.7, py + TILE_SIZE * 0.2);
+               ctx.lineTo(px + TILE_SIZE * 0.3, py + TILE_SIZE * 0.6);
+               ctx.lineTo(px + TILE_SIZE * 0.5, py + TILE_SIZE * 0.6);
+               ctx.lineTo(px + TILE_SIZE * 0.3, py + TILE_SIZE * 0.9);
+               ctx.lineTo(px + TILE_SIZE * 0.7, py + TILE_SIZE * 0.5);
+               ctx.lineTo(px + TILE_SIZE * 0.5, py + TILE_SIZE * 0.5);
+               ctx.closePath();
+               ctx.fill();
+            } else if (tile === TileType.ITEM_PHASE) {
+                // Draw Phase Eye
+                ctx.fillStyle = '#ff00ff';
+                ctx.shadowColor = '#ff00ff';
+                ctx.shadowBlur = 15;
+                ctx.beginPath();
+                ctx.arc(px + TILE_SIZE/2, py + TILE_SIZE/2, TILE_SIZE * 0.3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.arc(px + TILE_SIZE/2, py + TILE_SIZE/2, TILE_SIZE * 0.1, 0, Math.PI * 2);
+                ctx.fill();
             }
           }
         }
@@ -234,86 +260,147 @@ export default function App() {
       ctx.globalAlpha = 1.0;
     });
 
-    // 3. Draw Player ("Cyber-Pac" Drone)
+    const timeSec = Date.now() / 1000;
+
+    // 3. Draw Player Trail
+    const p = engine.player;
+    if (p.trail && p.trail.length > 1) {
+        ctx.lineCap = 'round';
+        // Only draw last N segments for performance and style
+        const segments = p.trail.slice(-10);
+        for (let i = 0; i < segments.length - 1; i++) {
+            const p1 = segments[i];
+            const p2 = segments[i+1];
+            const ratio = i / segments.length; // 0 to 1
+            
+            // Dynamic width: Start thicker, fade to nothing
+            const width = 2 + (ratio * TILE_SIZE * 0.8);
+            // Alpha fades out faster at the tail
+            const alpha = Math.pow(ratio, 2) * 0.6;
+
+            ctx.beginPath();
+            ctx.lineWidth = width;
+            ctx.strokeStyle = p.activeEffect === ItemType.SPEED ? '#00ffff' : p.color;
+            ctx.globalAlpha = alpha;
+            ctx.shadowBlur = 15 * ratio;
+            ctx.shadowColor = p.color;
+            ctx.moveTo(p1.x * TILE_SIZE, p1.y * TILE_SIZE);
+            ctx.lineTo(p2.x * TILE_SIZE, p2.y * TILE_SIZE);
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1.0;
+    }
+
+    // 4. Draw Player Orb (3D Style)
     if (engine.state !== 'DYING' || Math.random() > 0.5) {
-        const p = engine.player;
         const px = p.x * TILE_SIZE;
         const py = p.y * TILE_SIZE;
-        const radius = TILE_SIZE * 0.42;
+        const radius = TILE_SIZE * 0.45;
 
         ctx.save();
         ctx.translate(px, py);
 
-        // Determine Rotation based on Direction
+        // Apply rotation for Directional Look
         let rotation = 0;
+        let scaleY = 1;
+
         if (p.dir === 'UP') rotation = -Math.PI / 2;
         else if (p.dir === 'DOWN') rotation = Math.PI / 2;
-        else if (p.dir === 'LEFT') rotation = Math.PI;
+        else if (p.dir === 'LEFT') {
+             rotation = Math.PI;
+             scaleY = -1; // Flip Y to keep eye on top
+        }
         else if (p.dir === 'RIGHT') rotation = 0;
-        else if (p.dir === 'NONE') rotation = 0; // Default right
         
         ctx.rotate(rotation);
+        ctx.scale(1, scaleY);
 
-        // Mouth Animation (Sine Wave)
-        const time = Date.now() / 100; // Speed
-        // Chomp angle: 0 (closed) to 0.25 PI (open)
-        const mouthOpen = Math.abs(Math.sin(time * 1.5)) * 0.25 * Math.PI; 
+        // Breathing/Pulsating effect for depth
+        const pulse = 1 + Math.sin(timeSec * 8) * 0.05;
+        
+        // Main Orb Body with Radial Gradient for 3D look
+        const gradient = ctx.createRadialGradient(-radius*0.3, -radius*0.3, radius*0.1, 0, 0, radius);
+        
+        let colorMain = p.color;
+        let colorLight = '#ffffcc';
+        let colorDark = '#b3b300'; // Darker yellow for shadow
 
-        // Draw Glow
-        ctx.shadowColor = p.color;
-        ctx.shadowBlur = 20;
+        if (p.activeEffect === ItemType.PHASE) {
+            colorMain = '#ff00ff';
+            colorLight = '#ffccff';
+            colorDark = '#b300b3';
+        } else if (p.activeEffect === ItemType.SPEED) {
+            colorMain = '#00ffff';
+            colorLight = '#ccffff';
+            colorDark = '#00b3b3';
+        }
 
-        // Draw Body (Wedge)
-        ctx.fillStyle = p.color;
+        gradient.addColorStop(0, colorLight);
+        gradient.addColorStop(0.5, colorMain);
+        gradient.addColorStop(1, colorDark);
+
+        // Outer Glow
+        ctx.shadowColor = colorMain;
+        ctx.shadowBlur = 20 * pulse;
+
+        // Draw Orb
+        ctx.fillStyle = gradient;
         ctx.beginPath();
-        // Arc from mouthOpen to 2PI - mouthOpen
-        // 0 is East (Right), so mouth is centered on 0
-        ctx.arc(0, 0, radius, mouthOpen, (2 * Math.PI) - mouthOpen);
-        ctx.lineTo(0, 0); // Connect to center to form wedge
+        // Slightly squashed circle if moving fast?
+        ctx.arc(0, 0, radius * pulse, 0, Math.PI * 2);
         ctx.fill();
 
-        // Draw Inner Core (Tech detail)
-        ctx.fillStyle = '#ffffff';
-        ctx.shadowBlur = 5;
+        // Mouth / Visor Opening (Mechanical look)
+        const mouthOpen = 0.2 + Math.abs(Math.sin(timeSec * 15)) * 0.3; // Rapid chomp
+        ctx.fillStyle = '#000';
         ctx.beginPath();
-        ctx.arc(0, 0, radius * 0.3, 0, Math.PI * 2);
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, radius * pulse + 1, -mouthOpen * 0.5, mouthOpen * 0.5);
         ctx.fill();
 
-        // Draw Eye (Relative to rotation)
-        // Positioned slightly up and towards the front
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = '#000000'; // Eye Socket
-        const eyeX = radius * 0.2;
+        // Eye / Lens (Directional Indicator)
+        const eyeX = radius * 0.3;
         const eyeY = -radius * 0.5;
+        
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#111';
         ctx.beginPath();
-        ctx.arc(eyeX, eyeY, radius * 0.15, 0, Math.PI * 2);
+        ctx.arc(eyeX, eyeY, radius * 0.2, 0, Math.PI * 2);
         ctx.fill();
-
-        // Eye Light
-        ctx.fillStyle = '#ffffff'; 
+        
+        ctx.fillStyle = colorLight;
         ctx.beginPath();
-        ctx.arc(eyeX + 1, eyeY - 1, radius * 0.05, 0, Math.PI * 2);
+        ctx.arc(eyeX + 1, eyeY - 1, radius * 0.08, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.restore();
     }
 
-    // 4. Draw Ghosts
+    // 5. Draw Ghosts
     if (engine.ghosts) {
         engine.ghosts.forEach(g => {
             let color = g.color;
             if (g.state === GhostState.FRIGHTENED) color = '#0000ff';
             if (g.state === GhostState.EATEN) color = 'rgba(0,0,0,0)'; 
 
-            // NEW: Faint Pulsating Aura
+            // Subtler Aura with proximity-based pulse
             if (g.state !== GhostState.EATEN) {
-                const pulse = (Math.sin(Date.now() / 200) + 1) / 2; // 0 to 1
-                const auraRadius = TILE_SIZE * (0.5 + pulse * 0.25);
+                const dist = Math.hypot(g.x - engine.player.x, g.y - engine.player.y);
+                // Proximity factor: 0 (far) to 1 (close, < 6 tiles)
+                const proximity = Math.max(0, 1 - (dist / 8));
+                
+                // Pulse speeds up when close
+                const pulseSpeed = 2 + (proximity * 6); 
+                const pulse = (Math.sin(timeSec * pulseSpeed) + 1) / 2;
+                
+                // Subtle radius change
+                const auraRadius = TILE_SIZE * (0.6 + pulse * 0.1);
                 
                 ctx.save();
                 ctx.fillStyle = color;
-                ctx.globalAlpha = 0.15; // Faint
-                ctx.shadowBlur = 20;
+                // Opacity increases slightly with proximity
+                ctx.globalAlpha = 0.05 + (0.15 * proximity) + (0.05 * pulse); 
+                ctx.shadowBlur = 10 + (10 * pulse);
                 ctx.shadowColor = color;
                 ctx.beginPath();
                 ctx.arc(g.x * TILE_SIZE, g.y * TILE_SIZE, auraRadius, 0, Math.PI * 2);
@@ -321,28 +408,33 @@ export default function App() {
                 ctx.restore();
             }
 
-            // Draw Trail
+            // Enhanced Ghost Trail
             if (g.state !== GhostState.EATEN && g.trail.length > 1) {
               const trailColor = g.state === GhostState.FRIGHTENED ? '#0000ff' : g.color;
               ctx.lineCap = 'round';
               
-              for (let i = 0; i < g.trail.length - 1; i++) {
+              // Draw
+              const len = g.trail.length;
+              for (let i = 0; i < len - 1; i++) {
                 const p1 = g.trail[i];
                 const p2 = g.trail[i+1];
+                const ratio = i / len;
                 
-                // Tapering width: Thinner at the tail (index 0), thicker at head
-                const ratio = i / g.trail.length;
-                const width = 2 + (ratio * TILE_SIZE * 0.4); 
+                // Quadratic fade for smoother tail
+                const alpha = Math.pow(ratio, 2) * 0.5;
                 
-                // Dynamic Opacity
-                const alpha = ratio * 0.6; // Max 0.6 opacity
+                // Thickness tapers
+                const width = 1 + (ratio * TILE_SIZE * 0.6);
 
                 ctx.beginPath();
                 ctx.lineWidth = width;
                 ctx.strokeStyle = trailColor;
                 ctx.globalAlpha = alpha;
-                ctx.shadowBlur = 15 * ratio;
+                
+                // Only blur the head of the trail
+                ctx.shadowBlur = ratio * 15;
                 ctx.shadowColor = trailColor;
+                
                 ctx.moveTo(p1.x * TILE_SIZE, p1.y * TILE_SIZE);
                 ctx.lineTo(p2.x * TILE_SIZE, p2.y * TILE_SIZE);
                 ctx.stroke();
@@ -350,7 +442,7 @@ export default function App() {
               ctx.globalAlpha = 1.0;
             }
 
-            // Draw Ghost Body
+            // Ghost Body
             ctx.fillStyle = color;
             ctx.shadowColor = color;
             ctx.shadowBlur = g.state === GhostState.FRIGHTENED ? 5 : 15;
@@ -402,32 +494,56 @@ export default function App() {
 
   return (
     <div className="relative w-full h-screen bg-black overflow-hidden font-mono text-white">
-      {/* Canvas Layer */}
       <canvas 
         ref={canvasRef} 
         className="absolute top-0 left-0 w-full h-full block"
       />
 
-      {/* CRT Overlay */}
       <div className="absolute inset-0 pointer-events-none z-10 crt-scanline opacity-30 mix-blend-overlay" />
       <div className="absolute inset-0 pointer-events-none z-10 crt-flicker bg-gradient-to-br from-transparent to-black/40" />
       <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_100px_rgba(0,0,0,0.9)] z-20" />
 
-      {/* HUD - Resized for better visibility */}
-      <div className="absolute top-4 left-4 z-30 flex flex-col gap-2 chromatic-aberration pointer-events-none">
-         <h1 className="text-2xl md:text-5xl text-yellow-400 font-bold tracking-widest drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">NEON MAZE</h1>
-         <div className="flex flex-col gap-1 mt-1">
-            <div className="text-xl md:text-3xl text-cyan-300 drop-shadow-md font-bold">SCORE: {score}</div>
-            <div className="text-lg md:text-2xl text-red-400 drop-shadow-md">HIGH: {highScore}</div>
+      {/* HUD CONTAINER - Top Left */}
+      <div className="absolute top-4 left-4 z-30 flex flex-col gap-4 pointer-events-none">
+         {/* SCORE & TITLE */}
+         <div className="flex flex-col gap-2 chromatic-aberration">
+            <h1 className="text-2xl md:text-5xl text-yellow-400 font-bold tracking-widest drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">NEON MAZE</h1>
+            <div className="flex flex-col gap-1 mt-1">
+                <div className="text-xl md:text-3xl text-cyan-300 drop-shadow-md font-bold">SCORE: {score}</div>
+                <div className="text-lg md:text-2xl text-red-400 drop-shadow-md">HIGH: {highScore}</div>
+            </div>
          </div>
-         {gameState === GameState.PLAYING && (
-           <div className="text-sm text-gray-500 mt-2 md:hidden">PRESS 'P' TO PAUSE</div>
-         )}
+
+         {/* INVENTORY SLOT - Moved here to be close but safe */}
+         <div className="flex flex-row items-center gap-3 bg-black/40 p-2 rounded border border-gray-800/50 backdrop-blur-sm">
+              <div className={`w-12 h-12 border-2 ${inventory !== ItemType.NONE ? 'border-white bg-white/10' : 'border-gray-700 bg-black/50'} flex items-center justify-center rounded transition-all`}>
+                  {inventory === ItemType.SPEED && <span className="text-2xl text-cyan-400 drop-shadow-[0_0_5px_cyan]">⚡</span>}
+                  {inventory === ItemType.PHASE && <span className="text-2xl text-pink-400 drop-shadow-[0_0_5px_pink]">👁️</span>}
+                  {inventory === ItemType.NONE && <span className="text-gray-700 text-xs">EMPTY</span>}
+              </div>
+              <div className="flex flex-col justify-center">
+                  <span className="text-gray-400 text-[10px] tracking-widest">INVENTORY</span>
+                  {inventory !== ItemType.NONE && (
+                      <span className="text-[10px] text-cyan-200 animate-pulse font-bold leading-tight">
+                        PRESS SPACE<br/>TO USE
+                      </span>
+                  )}
+              </div>
+         </div>
       </div>
 
+      {/* LIVES - Top Right */}
       <div className="absolute top-6 right-6 z-30 flex gap-3 pointer-events-none">
          {Array.from({length: Math.max(0, lives)}).map((_, i) => (
-             <div key={i} className="w-6 h-6 rounded-full bg-yellow-400 shadow-[0_0_10px_yellow]" />
+             <svg key={i} width="24" height="24" viewBox="0 0 24 24" className="filter drop-shadow-[0_0_5px_rgba(255,234,0,0.8)]">
+                {/* Pacman Body Shape */}
+                <path d="M12 12 L20.66 7 A 10 10 0 1 0 20.66 17 Z" fill="#ffea00" />
+                {/* Inner Core */}
+                <circle cx="12" cy="12" r="3" fill="white" className="opacity-80" />
+                {/* Eye */}
+                <circle cx="14" cy="6" r="2" fill="black" />
+                <circle cx="14.5" cy="5.5" r="0.8" fill="white" />
+             </svg>
          ))}
       </div>
 
@@ -442,7 +558,6 @@ export default function App() {
              NEON<br/>RUNNER
            </h1>
            
-           {/* Theme Selector */}
            <div className="mb-8 flex flex-col items-center">
              <div className="text-gray-400 text-xs mb-2">SELECT STARTING THEME</div>
              <div className="flex items-center gap-4">
@@ -480,7 +595,7 @@ export default function App() {
              INSERT COIN / START
            </button>
            <p className="mt-8 text-gray-400 text-xs md:text-sm text-center">
-             ARROWS or SWIPE to Move<br/>Avoid the Neon Ghosts
+             ARROWS or SWIPE to Move<br/>SPACE to Use Powerup
            </p>
         </div>
       )}
@@ -507,7 +622,6 @@ export default function App() {
               {getThemeName()}
            </p>
            
-           {/* Display Modifier if Active */}
            {getModifierName() && (
              <div className="mt-6 text-red-500 border border-red-500 px-4 py-2 animate-pulse bg-red-900/30">
                 WARNING: {getModifierName()}
@@ -539,7 +653,16 @@ export default function App() {
 
       {/* Mobile Controls */}
       {gameState === GameState.PLAYING && (
-        <VirtualJoystick onDirectionChange={handleJoystickDir} />
+        <>
+            <VirtualJoystick onDirectionChange={handleJoystickDir} />
+            {/* Action Button for Mobile */}
+            <button 
+                className={`fixed bottom-10 left-10 w-20 h-20 rounded-full border-4 flex items-center justify-center z-50 transition-all active:scale-95 touch-none md:hidden ${inventory !== ItemType.NONE ? 'border-cyan-400 bg-cyan-900/50 shadow-[0_0_20px_cyan]' : 'border-gray-600 bg-gray-900/50 opacity-50'}`}
+                onTouchStart={(e) => { e.preventDefault(); handleMobileAction(); }}
+            >
+                <span className="text-2xl font-bold text-white">!</span>
+            </button>
+        </>
       )}
     </div>
   );

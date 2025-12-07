@@ -1,3 +1,4 @@
+
 export type Direction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT' | 'NONE';
 
 export enum TileType {
@@ -6,6 +7,8 @@ export enum TileType {
   POWER_PELLET = 2,
   EMPTY = 3,
   GHOST_HOUSE = 4,
+  ITEM_SPEED = 5,
+  ITEM_PHASE = 6,
 }
 
 export enum GameState {
@@ -22,14 +25,25 @@ export interface Position {
   y: number;
 }
 
+export enum ItemType {
+  NONE = 'NONE',
+  SPEED = 'SPEED_BOOST',
+  PHASE = 'PHASE_SHIFT',
+}
+
 export interface Entity {
   x: number;
   y: number;
   dir: Direction;
   nextDir: Direction;
   speed: number;
+  baseSpeed: number; // Added to reset speed after boost
   radius: number;
   color: string;
+  inventory: ItemType;
+  activeEffect: ItemType;
+  effectTimer: number;
+  trail: Position[];
 }
 
 export enum GhostType {
@@ -49,7 +63,6 @@ export interface Ghost extends Entity {
   type: GhostType;
   state: GhostState;
   scaredTimer: number;
-  trail: Position[];
 }
 
 export interface Particle {
