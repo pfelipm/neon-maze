@@ -20,143 +20,20 @@ export default function App() {
   
   const [selectedThemeIndex, setSelectedThemeIndex] = useState(0);
 
-  // Initialize Game Loop
-  const animate = useCallback(() => {
-    if (!engineRef.current) {
-        engineRef.current = new GameEngine();
-    }
-    const engine = engineRef.current;
-    
-    if (gameState === GameState.PLAYING) {
-      try {
-        engine.update(0.016); 
-      } catch (e) {
-        console.error("Game Loop Error:", e);
-      }
-      
-      if (engine.state === 'DYING') {
-        setTimeout(() => {
-          if (engine.lives > 0) {
-            engine.resetPositions();
-          } else {
-            setGameState(GameState.GAME_OVER);
-            setHighScore(prev => Math.max(prev, engine.score));
-          }
-        }, 2000);
-      } else if (engine.checkLevelComplete()) {
-         setGameState(GameState.LEVEL_COMPLETE);
-         setTimeout(() => {
-            engine.resetLevel(engine.level + 1);
-            setGameState(GameState.LEVEL_START);
-            setTimeout(() => {
-                setGameState(GameState.PLAYING);
-            }, 2500);
-         }, 2000);
-      }
-    }
-
-    // Sync React State periodically
-    if (Math.random() < 0.1) {
-       setScore(engine.score);
-       setLives(engine.lives);
-       setLevel(engine.level);
-       setInventory(engine.player.inventory);
-    }
-
-    draw();
-    requestRef.current = requestAnimationFrame(animate);
-  }, [gameState, selectedThemeIndex]);
-
-  useEffect(() => {
-    requestRef.current = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(requestRef.current!);
-  }, [animate]);
-
-  useEffect(() => {
-    const handleResize = () => {
-       if (canvasRef.current) {
-           canvasRef.current.width = window.innerWidth;
-           canvasRef.current.height = window.innerHeight;
-       }
-    };
-    window.addEventListener('resize', handleResize);
-    handleResize(); 
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Input Handling
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Pause Handling
-      if (e.code === 'KeyP' || e.code === 'Escape') {
-        if (gameState === GameState.PLAYING) {
-          setGameState(GameState.PAUSED);
-          return;
-        } else if (gameState === GameState.PAUSED) {
-          setGameState(GameState.PLAYING);
-          return;
-        }
-      }
-
-      if (gameState === GameState.MENU || gameState === GameState.GAME_OVER) {
-        if (e.code === 'Space' || e.code === 'Enter') {
-          startGame();
-        }
-        return;
-      }
-      
-      if (gameState === GameState.PAUSED) return;
-
-      const engine = engineRef.current;
-      if (!engine) return;
-
-      switch(e.key) {
-        case 'ArrowUp': engine.player.nextDir = 'UP'; break;
-        case 'ArrowDown': engine.player.nextDir = 'DOWN'; break;
-        case 'ArrowLeft': engine.player.nextDir = 'LEFT'; break;
-        case 'ArrowRight': engine.player.nextDir = 'RIGHT'; break;
-        case ' ': // Spacebar for Item
-          engine.activateItem();
-          setInventory(ItemType.NONE); // Optimistic UI update
-          break;
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [gameState]);
-
-  const startGame = () => {
-    audioManager.init();
-    audioManager.resume(); 
-    
-    if (!engineRef.current) engineRef.current = new GameEngine();
-    const engine = engineRef.current;
-    
-    engine.score = 0;
-    engine.lives = 3;
-    engine.resetLevel(1);
-    
-    setGameState(GameState.LEVEL_START);
-    setTimeout(() => {
-        setGameState(GameState.PLAYING);
-    }, 2500);
+  const getThemeName = () => {
+    if (!engineRef.current) return '';
+    const idx = (selectedThemeIndex + engineRef.current.level - 1) % THEMES.length;
+    return THEMES[idx].name;
   };
 
-  const handleJoystickDir = (dir: Direction) => {
-    if (engineRef.current && gameState === GameState.PLAYING) {
-      engineRef.current.player.nextDir = dir;
-    }
+  const getModifierName = () => {
+    if (!engineRef.current) return '';
+    if (engineRef.current.modifier === LevelModifier.NONE) return '';
+    return engineRef.current.modifier;
   };
 
-  const handleMobileAction = () => {
-    if (engineRef.current && gameState === GameState.PLAYING) {
-        engineRef.current.activateItem();
-        setInventory(ItemType.NONE);
-    }
-  };
-
-  // Rendering Logic
-  const draw = () => {
+  // Rendering Logic - Moved before animate to prevent ReferenceError
+  const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -266,16 +143,12 @@ export default function App() {
     const p = engine.player;
     if (p.trail && p.trail.length > 1) {
         ctx.lineCap = 'round';
-        // Only draw last N segments for performance and style
         const segments = p.trail.slice(-10);
         for (let i = 0; i < segments.length - 1; i++) {
             const p1 = segments[i];
             const p2 = segments[i+1];
-            const ratio = i / segments.length; // 0 to 1
-            
-            // Dynamic width: Start thicker, fade to nothing
+            const ratio = i / segments.length;
             const width = 2 + (ratio * TILE_SIZE * 0.8);
-            // Alpha fades out faster at the tail
             const alpha = Math.pow(ratio, 2) * 0.6;
 
             ctx.beginPath();
@@ -300,7 +173,6 @@ export default function App() {
         ctx.save();
         ctx.translate(px, py);
 
-        // Apply rotation for Directional Look
         let rotation = 0;
         let scaleY = 1;
 
@@ -308,22 +180,19 @@ export default function App() {
         else if (p.dir === 'DOWN') rotation = Math.PI / 2;
         else if (p.dir === 'LEFT') {
              rotation = Math.PI;
-             scaleY = -1; // Flip Y to keep eye on top
+             scaleY = -1; 
         }
         else if (p.dir === 'RIGHT') rotation = 0;
         
         ctx.rotate(rotation);
         ctx.scale(1, scaleY);
 
-        // Breathing/Pulsating effect for depth
         const pulse = 1 + Math.sin(timeSec * 8) * 0.05;
-        
-        // Main Orb Body with Radial Gradient for 3D look
         const gradient = ctx.createRadialGradient(-radius*0.3, -radius*0.3, radius*0.1, 0, 0, radius);
         
         let colorMain = p.color;
         let colorLight = '#ffffcc';
-        let colorDark = '#b3b300'; // Darker yellow for shadow
+        let colorDark = '#b3b300'; 
 
         if (p.activeEffect === ItemType.PHASE) {
             colorMain = '#ff00ff';
@@ -339,26 +208,21 @@ export default function App() {
         gradient.addColorStop(0.5, colorMain);
         gradient.addColorStop(1, colorDark);
 
-        // Outer Glow
         ctx.shadowColor = colorMain;
         ctx.shadowBlur = 20 * pulse;
 
-        // Draw Orb
         ctx.fillStyle = gradient;
         ctx.beginPath();
-        // Slightly squashed circle if moving fast?
         ctx.arc(0, 0, radius * pulse, 0, Math.PI * 2);
         ctx.fill();
 
-        // Mouth / Visor Opening (Mechanical look)
-        const mouthOpen = 0.2 + Math.abs(Math.sin(timeSec * 15)) * 0.3; // Rapid chomp
+        const mouthOpen = 0.2 + Math.abs(Math.sin(timeSec * 15)) * 0.3; 
         ctx.fillStyle = '#000';
         ctx.beginPath();
         ctx.moveTo(0, 0);
         ctx.arc(0, 0, radius * pulse + 1, -mouthOpen * 0.5, mouthOpen * 0.5);
         ctx.fill();
 
-        // Eye / Lens (Directional Indicator)
         const eyeX = radius * 0.3;
         const eyeY = -radius * 0.5;
         
@@ -383,22 +247,15 @@ export default function App() {
             if (g.state === GhostState.FRIGHTENED) color = '#0000ff';
             if (g.state === GhostState.EATEN) color = 'rgba(0,0,0,0)'; 
 
-            // Subtler Aura with proximity-based pulse
             if (g.state !== GhostState.EATEN) {
                 const dist = Math.hypot(g.x - engine.player.x, g.y - engine.player.y);
-                // Proximity factor: 0 (far) to 1 (close, < 6 tiles)
                 const proximity = Math.max(0, 1 - (dist / 8));
-                
-                // Pulse speeds up when close
                 const pulseSpeed = 2 + (proximity * 6); 
                 const pulse = (Math.sin(timeSec * pulseSpeed) + 1) / 2;
-                
-                // Subtle radius change
                 const auraRadius = TILE_SIZE * (0.6 + pulse * 0.1);
                 
                 ctx.save();
                 ctx.fillStyle = color;
-                // Opacity increases slightly with proximity
                 ctx.globalAlpha = 0.05 + (0.15 * proximity) + (0.05 * pulse); 
                 ctx.shadowBlur = 10 + (10 * pulse);
                 ctx.shadowColor = color;
@@ -408,30 +265,21 @@ export default function App() {
                 ctx.restore();
             }
 
-            // Enhanced Ghost Trail
             if (g.state !== GhostState.EATEN && g.trail.length > 1) {
               const trailColor = g.state === GhostState.FRIGHTENED ? '#0000ff' : g.color;
               ctx.lineCap = 'round';
-              
-              // Draw
               const len = g.trail.length;
               for (let i = 0; i < len - 1; i++) {
                 const p1 = g.trail[i];
                 const p2 = g.trail[i+1];
                 const ratio = i / len;
-                
-                // Quadratic fade for smoother tail
                 const alpha = Math.pow(ratio, 2) * 0.5;
-                
-                // Thickness tapers
                 const width = 1 + (ratio * TILE_SIZE * 0.6);
 
                 ctx.beginPath();
                 ctx.lineWidth = width;
                 ctx.strokeStyle = trailColor;
                 ctx.globalAlpha = alpha;
-                
-                // Only blur the head of the trail
                 ctx.shadowBlur = ratio * 15;
                 ctx.shadowColor = trailColor;
                 
@@ -442,7 +290,6 @@ export default function App() {
               ctx.globalAlpha = 1.0;
             }
 
-            // Ghost Body
             ctx.fillStyle = color;
             ctx.shadowColor = color;
             ctx.shadowBlur = g.state === GhostState.FRIGHTENED ? 5 : 15;
@@ -478,18 +325,141 @@ export default function App() {
     }
 
     ctx.restore();
+  }, [selectedThemeIndex]);
+
+  // Initialize Game Loop
+  const animate = useCallback(() => {
+    if (!engineRef.current) {
+        engineRef.current = new GameEngine();
+    }
+    const engine = engineRef.current;
+    
+    if (gameState === GameState.PLAYING) {
+      try {
+        engine.update(0.016); 
+      } catch (e) {
+        console.error("Game Loop Error:", e);
+      }
+      
+      if (engine.state === 'DYING') {
+        setTimeout(() => {
+          if (engine.lives > 0) {
+            engine.resetPositions();
+          } else {
+            setGameState(GameState.GAME_OVER);
+            setHighScore(prev => Math.max(prev, engine.score));
+          }
+        }, 2000);
+      } else if (engine.checkLevelComplete()) {
+         setGameState(GameState.LEVEL_COMPLETE);
+         setTimeout(() => {
+            engine.resetLevel(engine.level + 1);
+            setGameState(GameState.LEVEL_START);
+            setTimeout(() => {
+                setGameState(GameState.PLAYING);
+            }, 2500);
+         }, 2000);
+      }
+    }
+
+    // Sync React State periodically
+    if (Math.random() < 0.1) {
+       setScore(engine.score);
+       setLives(engine.lives);
+       setLevel(engine.level);
+       setInventory(engine.player.inventory);
+    }
+
+    draw();
+    requestRef.current = requestAnimationFrame(animate);
+  }, [gameState, draw]);
+
+  useEffect(() => {
+    requestRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(requestRef.current!);
+  }, [animate]);
+
+  useEffect(() => {
+    const handleResize = () => {
+       if (canvasRef.current) {
+           canvasRef.current.width = window.innerWidth;
+           canvasRef.current.height = window.innerHeight;
+       }
+    };
+    window.addEventListener('resize', handleResize);
+    handleResize(); 
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const startGame = () => {
+    audioManager.init();
+    audioManager.resume(); 
+    
+    if (!engineRef.current) engineRef.current = new GameEngine();
+    const engine = engineRef.current;
+    
+    engine.score = 0;
+    engine.lives = 3;
+    engine.resetLevel(1);
+    
+    setGameState(GameState.LEVEL_START);
+    setTimeout(() => {
+        setGameState(GameState.PLAYING);
+    }, 2500);
   };
 
-  const getThemeName = () => {
-    if (!engineRef.current) return '';
-    const idx = (selectedThemeIndex + engineRef.current.level - 1) % THEMES.length;
-    return THEMES[idx].name;
+  // Input Handling
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Pause Handling
+      if (e.code === 'KeyP' || e.code === 'Escape') {
+        if (gameState === GameState.PLAYING) {
+          setGameState(GameState.PAUSED);
+          return;
+        } else if (gameState === GameState.PAUSED) {
+          setGameState(GameState.PLAYING);
+          return;
+        }
+      }
+
+      if (gameState === GameState.MENU || gameState === GameState.GAME_OVER) {
+        if (e.code === 'Space' || e.code === 'Enter') {
+          startGame();
+        }
+        return;
+      }
+      
+      if (gameState === GameState.PAUSED) return;
+
+      const engine = engineRef.current;
+      if (!engine) return;
+
+      switch(e.key) {
+        case 'ArrowUp': engine.player.nextDir = 'UP'; break;
+        case 'ArrowDown': engine.player.nextDir = 'DOWN'; break;
+        case 'ArrowLeft': engine.player.nextDir = 'LEFT'; break;
+        case 'ArrowRight': engine.player.nextDir = 'RIGHT'; break;
+        case ' ': // Spacebar for Item
+          engine.activateItem();
+          setInventory(ItemType.NONE); // Optimistic UI update
+          break;
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [gameState]);
+
+  const handleJoystickDir = (dir: Direction) => {
+    if (engineRef.current && gameState === GameState.PLAYING) {
+      engineRef.current.player.nextDir = dir;
+    }
   };
 
-  const getModifierName = () => {
-    if (!engineRef.current) return '';
-    if (engineRef.current.modifier === LevelModifier.NONE) return '';
-    return engineRef.current.modifier;
+  const handleMobileAction = () => {
+    if (engineRef.current && gameState === GameState.PLAYING) {
+        engineRef.current.activateItem();
+        setInventory(ItemType.NONE);
+    }
   };
 
   return (
@@ -555,7 +525,7 @@ export default function App() {
       {gameState === GameState.MENU && (
         <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm">
            <h1 className="text-4xl md:text-6xl text-transparent bg-clip-text bg-gradient-to-b from-cyan-300 to-purple-500 font-black mb-8 animate-pulse text-center p-4 filter drop-shadow-[0_0_10px_rgba(0,255,255,0.8)]">
-             NEON<br/>RUNNER
+             NEON MAZE<br/>RUNNER
            </h1>
            
            <div className="mb-8 flex flex-col items-center">
