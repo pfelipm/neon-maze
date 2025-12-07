@@ -10,7 +10,7 @@ export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<GameEngine | null>(null);
   
-  const requestRef = useRef<number>();
+  const requestRef = useRef<number>(0);
   const [gameState, setGameState] = useState<GameState>(GameState.MENU);
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(3);
@@ -19,6 +19,7 @@ export default function App() {
   const [inventory, setInventory] = useState<ItemType>(ItemType.NONE);
   
   const [selectedThemeIndex, setSelectedThemeIndex] = useState(0);
+  const [gameOverActionIndex, setGameOverActionIndex] = useState(0); // 0: Restart, 1: Menu
 
   const getThemeName = () => {
     if (!engineRef.current) return '';
@@ -240,6 +241,42 @@ export default function App() {
         ctx.restore();
     }
 
+    // 4.5 Draw Respawn Indicator for Eaten Ghosts
+    if (engine.ghosts && engine.ghosts.some(g => g.state === GhostState.EATEN)) {
+        const homeX = 9.5 * TILE_SIZE;
+        const homeY = 9.5 * TILE_SIZE;
+        const time = Date.now() / 1000;
+
+        ctx.save();
+        ctx.translate(homeX, homeY);
+
+        // Pulsating Aura
+        const pulse = (Math.sin(time * 5) + 1) / 2;
+        const alpha = 0.1 + pulse * 0.2;
+        
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#ffffff';
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(0, 0, TILE_SIZE * 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Spiraling Particles (Simulated)
+        ctx.fillStyle = '#ffffff';
+        for(let i = 0; i < 8; i++) {
+            const angle = (Math.PI * 2 * i / 8) + (time * 3);
+            const radius = TILE_SIZE * (1.5 - ((time * 2 + i/2) % 1.5)); // Move inwards
+            const pAlpha = Math.max(0, radius / (TILE_SIZE * 1.5)); // Fade as they get close
+            
+            ctx.globalAlpha = pAlpha;
+            ctx.beginPath();
+            ctx.arc(Math.cos(angle) * radius, Math.sin(angle) * radius, 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.restore();
+    }
+
     // 5. Draw Ghosts
     if (engine.ghosts) {
         engine.ghosts.forEach(g => {
@@ -324,8 +361,42 @@ export default function App() {
         });
     }
 
+    // 6. Draw Countdown (READY / GO)
+    // Only draw if we are actively playing (this hides it under Level Start overlay)
+    if (gameState === GameState.PLAYING && engine.startTimer > 0) {
+        ctx.save();
+        
+        // We are inside map transform (offsetX, offsetY, scale)
+        // Find center of the map
+        const cx = (MAP_WIDTH * TILE_SIZE) / 2;
+        const cy = (MAP_HEIGHT * TILE_SIZE) / 2;
+
+        const text = engine.startTimer > 1.0 ? "READY" : "GO!";
+        const color = engine.startTimer > 1.0 ? "#ff0055" : "#00ff00";
+        
+        // Heartbeat animation
+        const pulse = 1 + Math.sin(Date.now() / 100) * 0.1;
+
+        ctx.translate(cx, cy);
+        ctx.scale(pulse, pulse);
+        
+        ctx.fillStyle = color;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 20;
+        ctx.font = "bold 60px 'Press Start 2P'";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(text, 0, 0);
+        
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "white";
+        ctx.strokeText(text, 0, 0);
+        
+        ctx.restore();
+    }
+
     ctx.restore();
-  }, [selectedThemeIndex]);
+  }, [selectedThemeIndex, gameState]);
 
   // Initialize Game Loop
   const animate = useCallback(() => {
@@ -357,7 +428,7 @@ export default function App() {
             setGameState(GameState.LEVEL_START);
             setTimeout(() => {
                 setGameState(GameState.PLAYING);
-            }, 2500);
+            }, 2000); // Reduced from 2500ms for better pacing
          }, 2000);
       }
     }
@@ -405,12 +476,41 @@ export default function App() {
     setGameState(GameState.LEVEL_START);
     setTimeout(() => {
         setGameState(GameState.PLAYING);
-    }, 2500);
+    }, 2000); // Reduced from 2500ms for better pacing
   };
 
   // Input Handling
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Menu Navigation
+      if (gameState === GameState.MENU) {
+          if (e.code === 'ArrowLeft') {
+              setSelectedThemeIndex((prev) => (prev - 1 + THEMES.length) % THEMES.length);
+          }
+          if (e.code === 'ArrowRight') {
+              setSelectedThemeIndex((prev) => (prev + 1) % THEMES.length);
+          }
+          if (e.code === 'Space' || e.code === 'Enter') {
+              startGame();
+          }
+          return;
+      }
+
+      // Game Over Navigation
+      if (gameState === GameState.GAME_OVER) {
+          if (e.code === 'ArrowUp' || e.code === 'ArrowDown') {
+              setGameOverActionIndex(prev => prev === 0 ? 1 : 0);
+          }
+          if (e.code === 'Space' || e.code === 'Enter') {
+              if (gameOverActionIndex === 0) startGame();
+              else setGameState(GameState.MENU);
+          }
+          if (e.code === 'Escape') {
+              setGameState(GameState.MENU);
+          }
+          return;
+      }
+
       // Pause Handling
       if (e.code === 'KeyP' || e.code === 'Escape') {
         if (gameState === GameState.PLAYING) {
@@ -421,15 +521,14 @@ export default function App() {
           return;
         }
       }
-
-      if (gameState === GameState.MENU || gameState === GameState.GAME_OVER) {
-        if (e.code === 'Space' || e.code === 'Enter') {
-          startGame();
-        }
-        return;
-      }
       
-      if (gameState === GameState.PAUSED) return;
+      // PAUSED State Handling (Added Space/Enter Resume support)
+      if (gameState === GameState.PAUSED) {
+          if (e.code === 'Space' || e.code === 'Enter') {
+              setGameState(GameState.PLAYING);
+          }
+          return;
+      }
 
       const engine = engineRef.current;
       if (!engine) return;
@@ -447,7 +546,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [gameState]);
+  }, [gameState, gameOverActionIndex]);
 
   const handleJoystickDir = (dir: Direction) => {
     if (engineRef.current && gameState === GameState.PLAYING) {
@@ -529,7 +628,7 @@ export default function App() {
            </h1>
            
            <div className="mb-8 flex flex-col items-center">
-             <div className="text-gray-400 text-xs mb-2">SELECT STARTING THEME</div>
+             <div className="text-gray-400 text-xs mb-2">SELECT STARTING THEME / MOVE</div>
              <div className="flex items-center gap-4">
                <button 
                  onClick={() => setSelectedThemeIndex((prev) => (prev - 1 + THEMES.length) % THEMES.length)}
@@ -560,7 +659,7 @@ export default function App() {
 
            <button 
              onClick={startGame}
-             className="px-8 py-4 border-2 border-cyan-400 text-cyan-400 hover:bg-cyan-400 hover:text-black transition-all text-xl tracking-widest shadow-[0_0_15px_rgba(34,211,238,0.5)]"
+             className="px-8 py-4 border-2 border-cyan-400 text-cyan-400 bg-cyan-900/50 scale-110 shadow-[0_0_15px_rgba(34,211,238,0.5)] transition-all text-xl tracking-widest"
            >
              INSERT COIN / START
            </button>
@@ -575,7 +674,7 @@ export default function App() {
            <h2 className="text-4xl md:text-5xl text-cyan-400 font-bold mb-8 tracking-widest chromatic-aberration">PAUSED</h2>
            <button 
              onClick={() => setGameState(GameState.PLAYING)}
-             className="px-8 py-4 border-2 border-cyan-400 text-cyan-400 hover:bg-cyan-400 hover:text-black transition-all text-xl shadow-[0_0_15px_rgba(34,211,238,0.5)]"
+             className="px-8 py-4 border-2 border-cyan-400 text-cyan-400 bg-cyan-900/50 scale-110 shadow-[0_0_15px_rgba(34,211,238,0.5)] transition-all text-xl tracking-widest"
            >
              RESUME
            </button>
@@ -605,13 +704,26 @@ export default function App() {
       {gameState === GameState.GAME_OVER && (
         <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-red-900/40 backdrop-blur-sm">
            <h2 className="text-5xl text-red-500 font-bold mb-4 chromatic-aberration">GAME OVER</h2>
-           <p className="text-xl mb-8">FINAL SCORE: {score}</p>
-           <button 
-             onClick={() => setGameState(GameState.MENU)}
-             className="px-6 py-3 border-2 border-white text-white hover:bg-white hover:text-red-900 transition-all"
-           >
-             MAIN MENU
-           </button>
+           <p className="text-xl mb-4">FINAL SCORE: {score}</p>
+           
+           <div className="flex flex-col gap-4">
+               <button 
+                 onClick={startGame}
+                 onMouseEnter={() => setGameOverActionIndex(0)}
+                 className={`px-6 py-3 border-2 transition-all ${gameOverActionIndex === 0 ? 'border-cyan-400 text-cyan-400 bg-cyan-900/50 scale-110 shadow-[0_0_15px_cyan]' : 'border-gray-500 text-gray-500'}`}
+               >
+                 TRY AGAIN
+               </button>
+               <button 
+                 onClick={() => setGameState(GameState.MENU)}
+                 onMouseEnter={() => setGameOverActionIndex(1)}
+                 className={`px-6 py-3 border-2 transition-all ${gameOverActionIndex === 1 ? 'border-cyan-400 text-cyan-400 bg-cyan-900/50 scale-110 shadow-[0_0_15px_cyan]' : 'border-gray-500 text-gray-500'}`}
+               >
+                 MAIN MENU
+               </button>
+           </div>
+
+           <p className="mt-8 text-xs text-gray-400 animate-pulse">PRESS SPACE TO SELECT</p>
         </div>
       )}
 

@@ -16,7 +16,9 @@ export class GameEngine {
   
   private modeTimer: number = 0;
   private dotsRemaining: number = 0;
-  private itemSpawnTimer: number = 0; // Timer for spawning items
+  private itemSpawnTimer: number = 0; 
+  public startTimer: number = 0; // Public so App.tsx can read it
+  private countdownStage: 'READY' | 'GO' | 'DONE' = 'DONE';
 
   constructor() {
     // Initial placeholder
@@ -62,6 +64,10 @@ export class GameEngine {
   }
 
   resetPositions() {
+    // Freeze movement for 2.5 seconds on reset to prevent jitter and give "Ready" time
+    this.startTimer = 2.5;
+    this.countdownStage = 'READY'; // Reset sound stage so it plays in update loop
+
     // Determine speed based on modifier
     let playerSpeed = MOVEMENT_SPEED + (this.level * 0.01);
     if (this.modifier === LevelModifier.SLOW_PLAYER) playerSpeed *= 0.85;
@@ -85,13 +91,19 @@ export class GameEngine {
     const ghostTypes = [GhostType.AGGRESSIVE, GhostType.AMBUSH, GhostType.RANDOM];
     const getRandomType = () => ghostTypes[Math.floor(Math.random() * ghostTypes.length)];
     
+    // Helper to determine safe initial direction in Ghost House
+    const getSafeHouseDir = (x: number): Direction => {
+        if (Math.abs(x - 9.5) < 0.1) return 'UP';
+        return x < 9.5 ? 'RIGHT' : 'LEFT';
+    };
+
     // Base 5 Ghosts (Default)
     this.ghosts = [
       { x: 9.5, y: 8.5, dir: 'LEFT', nextDir: 'LEFT', speed: ghostBaseSpeed, baseSpeed: ghostBaseSpeed, radius: 0.4, color: '#ff0000', type: GhostType.AGGRESSIVE, state: GhostState.SCATTER, scaredTimer: 0, trail: [], inventory: ItemType.NONE, activeEffect: ItemType.NONE, effectTimer: 0 },
       { x: 9.5, y: 9.5, dir: 'UP', nextDir: 'UP', speed: ghostBaseSpeed * 0.95, baseSpeed: ghostBaseSpeed * 0.95, radius: 0.4, color: '#ffb8ff', type: GhostType.AMBUSH, state: GhostState.SCATTER, scaredTimer: 0, trail: [], inventory: ItemType.NONE, activeEffect: ItemType.NONE, effectTimer: 0 },
-      { x: 9.5, y: 10.5, dir: 'RIGHT', nextDir: 'RIGHT', speed: ghostBaseSpeed * 0.9, baseSpeed: ghostBaseSpeed * 0.9, radius: 0.4, color: '#00ffff', type: GhostType.RANDOM, state: GhostState.SCATTER, scaredTimer: 0, trail: [], inventory: ItemType.NONE, activeEffect: ItemType.NONE, effectTimer: 0 },
-      { x: 8.5, y: 10.5, dir: 'LEFT', nextDir: 'LEFT', speed: ghostBaseSpeed * 0.92, baseSpeed: ghostBaseSpeed * 0.92, radius: 0.4, color: '#ffbf00', type: getRandomType(), state: GhostState.SCATTER, scaredTimer: 0, trail: [], inventory: ItemType.NONE, activeEffect: ItemType.NONE, effectTimer: 0 },
-      { x: 10.5, y: 10.5, dir: 'RIGHT', nextDir: 'RIGHT', speed: ghostBaseSpeed * 0.88, baseSpeed: ghostBaseSpeed * 0.88, radius: 0.4, color: '#39ff14', type: getRandomType(), state: GhostState.SCATTER, scaredTimer: 0, trail: [], inventory: ItemType.NONE, activeEffect: ItemType.NONE, effectTimer: 0 },
+      { x: 9.5, y: 10.5, dir: 'UP', nextDir: 'UP', speed: ghostBaseSpeed * 0.9, baseSpeed: ghostBaseSpeed * 0.9, radius: 0.4, color: '#00ffff', type: GhostType.RANDOM, state: GhostState.SCATTER, scaredTimer: 0, trail: [], inventory: ItemType.NONE, activeEffect: ItemType.NONE, effectTimer: 0 },
+      { x: 8.5, y: 10.5, dir: getSafeHouseDir(8.5), nextDir: getSafeHouseDir(8.5), speed: ghostBaseSpeed * 0.92, baseSpeed: ghostBaseSpeed * 0.92, radius: 0.4, color: '#ffbf00', type: getRandomType(), state: GhostState.SCATTER, scaredTimer: 0, trail: [], inventory: ItemType.NONE, activeEffect: ItemType.NONE, effectTimer: 0 },
+      { x: 10.5, y: 10.5, dir: getSafeHouseDir(10.5), nextDir: getSafeHouseDir(10.5), speed: ghostBaseSpeed * 0.88, baseSpeed: ghostBaseSpeed * 0.88, radius: 0.4, color: '#39ff14', type: getRandomType(), state: GhostState.SCATTER, scaredTimer: 0, trail: [], inventory: ItemType.NONE, activeEffect: ItemType.NONE, effectTimer: 0 },
     ];
 
     // "Escalada de Caos" (Chaos Escalation) Logic
@@ -124,9 +136,36 @@ export class GameEngine {
   update(dt: number) {
     if (this.state === 'DYING') return;
 
+    // 1. Update Particles ALWAYS (keeps effects alive)
+    this.updateParticles(dt);
+
+    // 2. Start Freeze Logic
+    // If startTimer is active, freeze all movement logic but keep drawing
+    if (this.startTimer > 0) {
+        // Trigger Sounds based on stage - Ensures syncing with Update loop
+        if (this.countdownStage === 'READY') {
+            audioManager.playReady();
+            this.countdownStage = 'GO';
+        }
+
+        this.startTimer -= dt;
+        
+        // Trigger "GO" sound when passing 1.0s mark
+        if (this.startTimer <= 1.0 && this.countdownStage === 'GO') {
+            audioManager.playGo();
+            this.countdownStage = 'DONE';
+        }
+
+        if (this.startTimer <= 0) this.startTimer = 0;
+        else return; // Skip UpdatePlayer and UpdateGhosts
+    }
+
     const time = Date.now() / 1000;
-    
-    // Mode Switching
+
+    // 3. Update Player (This handles Input, converting nextDir to dir)
+    this.updatePlayer(dt, time);
+
+    // 4. Update World Logic
     this.modeTimer += dt;
     const modeSwitchTime = this.modifier === LevelModifier.GHOST_FRENZY ? 10 : 20;
     if (this.modeTimer > modeSwitchTime) { 
@@ -142,9 +181,7 @@ export class GameEngine {
     // Item Spawning Logic
     this.updateItemSpawning(dt);
 
-    this.updatePlayer(dt, time);
     this.updateGhosts(dt);
-    this.updateParticles(dt);
   }
 
   private updateItemSpawning(dt: number) {
@@ -420,7 +457,12 @@ export class GameEngine {
       let targetX = this.player.x;
       let targetY = this.player.y;
 
-      if (ghost.state === GhostState.EATEN) {
+      // Force target to be the exit (approx 9.5, 8.5) if inside the house
+      // This ensures ghosts stream out immediately and don't get stuck in loops
+      if (this.map[gy][gx] === TileType.GHOST_HOUSE) {
+          targetX = 9.5;
+          targetY = 8.5; 
+      } else if (ghost.state === GhostState.EATEN) {
          targetX = 9.5; targetY = 9.5;
       } else if (ghost.state === GhostState.SCATTER) {
         if (ghost.type === GhostType.AGGRESSIVE) { targetX = MAP_WIDTH - 2; targetY = 1; }
