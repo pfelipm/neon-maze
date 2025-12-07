@@ -186,8 +186,8 @@ export class GameEngine {
 
   private updateItemSpawning(dt: number) {
     this.itemSpawnTimer += dt;
-    // Spawn item every 45 seconds
-    if (this.itemSpawnTimer > 45) {
+    // Spawn item every 20 seconds
+    if (this.itemSpawnTimer > 20) {
         this.itemSpawnTimer = 0;
 
         // Check how many items are currently on the map
