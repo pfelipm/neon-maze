@@ -2,6 +2,8 @@
 <img width="1200" height="475" alt="Neon Invaders Banner" src="public/banner.svg" />
 </div>
 
+> This is a small toy project, developed by the author using a 'vibe coding' approach with AI Studio.
+
 # Neon Maze
 
 [![Play Now on Google AI Studio](https://img.shields.io/badge/Play_Now-on_AI_Studio-green?style=for-the-badge&logo=google)](https://ai.studio/apps/drive/1irNj61KtrVi2XUJ70XwpJkQ7cak9ugHS?fullscreenApplet=true)
