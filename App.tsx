@@ -234,15 +234,68 @@ export default function App() {
       ctx.globalAlpha = 1.0;
     });
 
-    // 3. Draw Player
+    // 3. Draw Player ("Cyber-Pac" Drone)
     if (engine.state !== 'DYING' || Math.random() > 0.5) {
         const p = engine.player;
-        ctx.fillStyle = p.color;
+        const px = p.x * TILE_SIZE;
+        const py = p.y * TILE_SIZE;
+        const radius = TILE_SIZE * 0.42;
+
+        ctx.save();
+        ctx.translate(px, py);
+
+        // Determine Rotation based on Direction
+        let rotation = 0;
+        if (p.dir === 'UP') rotation = -Math.PI / 2;
+        else if (p.dir === 'DOWN') rotation = Math.PI / 2;
+        else if (p.dir === 'LEFT') rotation = Math.PI;
+        else if (p.dir === 'RIGHT') rotation = 0;
+        else if (p.dir === 'NONE') rotation = 0; // Default right
+        
+        ctx.rotate(rotation);
+
+        // Mouth Animation (Sine Wave)
+        const time = Date.now() / 100; // Speed
+        // Chomp angle: 0 (closed) to 0.25 PI (open)
+        const mouthOpen = Math.abs(Math.sin(time * 1.5)) * 0.25 * Math.PI; 
+
+        // Draw Glow
         ctx.shadowColor = p.color;
         ctx.shadowBlur = 20;
+
+        // Draw Body (Wedge)
+        ctx.fillStyle = p.color;
         ctx.beginPath();
-        ctx.arc(p.x * TILE_SIZE, p.y * TILE_SIZE, TILE_SIZE * 0.4, 0, Math.PI * 2);
+        // Arc from mouthOpen to 2PI - mouthOpen
+        // 0 is East (Right), so mouth is centered on 0
+        ctx.arc(0, 0, radius, mouthOpen, (2 * Math.PI) - mouthOpen);
+        ctx.lineTo(0, 0); // Connect to center to form wedge
         ctx.fill();
+
+        // Draw Inner Core (Tech detail)
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowBlur = 5;
+        ctx.beginPath();
+        ctx.arc(0, 0, radius * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Draw Eye (Relative to rotation)
+        // Positioned slightly up and towards the front
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#000000'; // Eye Socket
+        const eyeX = radius * 0.2;
+        const eyeY = -radius * 0.5;
+        ctx.beginPath();
+        ctx.arc(eyeX, eyeY, radius * 0.15, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Eye Light
+        ctx.fillStyle = '#ffffff'; 
+        ctx.beginPath();
+        ctx.arc(eyeX + 1, eyeY - 1, radius * 0.05, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
     }
 
     // 4. Draw Ghosts
