@@ -1,6 +1,7 @@
 # Neon Maze
 
 ![Neon Maze Banner](public/banner.svg)
+[![Play Now on Google AI Studio](https://img.shields.io/badge/Play_Now-on_AI_Studio-green?style=for-the-badge&logo=google)](https://ai.studio/apps/drive/1vCMNUg6BbhXntZn1VAftSxvkYgvo-NWk?fullscreenApplet=true)
 
 **Neon Maze** is a retro-futuristic arcade maze runner built with **React** and **TypeScript**. 
 Navigate glowing labyrinths, outmaneuver spectral pursuers, and chase high scores in this high-performance web experience.
@@ -9,8 +10,6 @@ Navigate glowing labyrinths, outmaneuver spectral pursuers, and chase high score
 Neon Maze brings the classic "eat the dots" arcade gameplay to the modern browser with a sleek, neon-drenched aesthetic. Built from scratch without heavy game engines, it demonstrates how to build performant games using the standard DOM and Canvas APIs.
 
 The game features a custom physics and state engine completely decoupled from the React view layer, ensuring smooth gameplay even on lower-end devices.
-
-**Play it live!** You can play Neon Maze directly in your browser: [https://ai.studio/apps/drive/1irNj61KtrVi2XUJ70XwpJkQ7cak9ugHS?fullscreenApplet=true](https://ai.studio/apps/drive/1irNj61KtrVi2XUJ70XwpJkQ7cak9ugHS?fullscreenApplet=true)
 
 ## Features
 *   **Classic Gameplay Loop:** Collect all pellets to win, avoid ghosts, and use power pellets to turn the tables.
