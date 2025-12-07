@@ -241,6 +241,42 @@ export default function App() {
         ctx.restore();
     }
 
+    // 4.5 Draw Respawn Indicator for Eaten Ghosts
+    if (engine.ghosts && engine.ghosts.some(g => g.state === GhostState.EATEN)) {
+        const homeX = 9.5 * TILE_SIZE;
+        const homeY = 9.5 * TILE_SIZE;
+        const time = Date.now() / 1000;
+
+        ctx.save();
+        ctx.translate(homeX, homeY);
+
+        // Pulsating Aura
+        const pulse = (Math.sin(time * 5) + 1) / 2;
+        const alpha = 0.1 + pulse * 0.2;
+        
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#ffffff';
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(0, 0, TILE_SIZE * 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Spiraling Particles (Simulated)
+        ctx.fillStyle = '#ffffff';
+        for(let i = 0; i < 8; i++) {
+            const angle = (Math.PI * 2 * i / 8) + (time * 3);
+            const radius = TILE_SIZE * (1.5 - ((time * 2 + i/2) % 1.5)); // Move inwards
+            const pAlpha = Math.max(0, radius / (TILE_SIZE * 1.5)); // Fade as they get close
+            
+            ctx.globalAlpha = pAlpha;
+            ctx.beginPath();
+            ctx.arc(Math.cos(angle) * radius, Math.sin(angle) * radius, 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.restore();
+    }
+
     // 5. Draw Ghosts
     if (engine.ghosts) {
         engine.ghosts.forEach(g => {
@@ -660,7 +696,8 @@ export default function App() {
                 WARNING: {getModifierName()}
              </div>
            )}
-           {/* READY? text removed to prevent sequence overlap */}
+
+           <p className="mt-8 text-sm text-gray-500 animate-pulse">READY?</p>
         </div>
       )}
 
