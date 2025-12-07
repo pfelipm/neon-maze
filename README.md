@@ -6,8 +6,6 @@
 
 [![Play Now on Google AI Studio](https://img.shields.io/badge/Play_Now-on_AI_Studio-green?style=for-the-badge&logo=google)](https://ai.studio/apps/drive/1irNj61KtrVi2XUJ70XwpJkQ7cak9ugHS?fullscreenApplet=true)
 
-![Neon Maze Banner](public/banner.svg)
-
 **Neon Maze** is a retro-futuristic arcade maze runner built with **React** and **TypeScript**. 
 Navigate glowing labyrinths, outmaneuver spectral pursuers, and chase high scores in this high-performance web experience.
 
