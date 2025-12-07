@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Neon Maze Runner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background-color: #050505;
+        font-family: 'Press Start 2P', cursive;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      /* Custom CRT Animations */
+      @keyframes scanline {
+        0% { transform: translateY(0%); }
+        100% { transform: translateY(100%); }
+      }
+      @keyframes flicker {
+        0% { opacity: 0.97; }
+        5% { opacity: 0.92; }
+        10% { opacity: 0.98; }
+        15% { opacity: 0.94; }
+        20% { opacity: 0.98; }
+        50% { opacity: 0.99; }
+        55% { opacity: 0.93; }
+        60% { opacity: 0.98; }
+        100% { opacity: 0.98; }
+      }
+      .crt-scanline {
+        background: linear-gradient(
+          to bottom,
+          rgba(255,255,255,0),
+          rgba(255,255,255,0) 50%,
+          rgba(0,0,0,0.2) 50%,
+          rgba(0,0,0,0.2)
+        );
+        background-size: 100% 4px;
+        animation: scanline 10s linear infinite;
+      }
+      .crt-flicker {
+        animation: flicker 0.15s infinite;
+      }
+      .chromatic-aberration {
+        text-shadow: -2px 0 #ff00de, 2px 0 #00ffff;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
+    "react/": "https://aistudiocdn.com/react@^19.2.1/"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
