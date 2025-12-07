@@ -15,7 +15,10 @@ The game features a custom physics and state engine completely decoupled from th
 **Play it live!** You can play Neon Maze directly in your browser: [https://ai.studio/apps/drive/1irNj61KtrVi2XUJ70XwpJkQ7cak9ugHS?fullscreenApplet=true](https://ai.studio/apps/drive/1irNj61KtrVi2XUJ70XwpJkQ7cak9ugHS?fullscreenApplet=true)
 
 ## Features
-*   **Classic Gameplay Loop:** Collect all pellets to win, avoid ghosts, and use power pellets to turn the tables.
+*   **Classic Arcade Gameplay:** Collect all dots (10 pts each) and power pellets (50 pts) to clear levels. Strategically use power pellets to temporarily turn the tables on ghosts (200 pts per eaten ghost).
+*   **Special Items (Power-ups):** Discover and activate unique items like 'Speed Boost' (80% speed increase for 3s) and 'Phase Shift' (3s invulnerability). These items appear every 45 seconds and can be stored for tactical use.
+*   **Dynamic Level Progression:** Starting from Level 2, levels randomly introduce 'Level Modifiers' (e.g., faster ghosts, slower player, frequent AI changes) at a 50% chance, ensuring varied and challenging gameplay.
+*   **Particle Effects & Trails:** Enjoy dynamic visual feedback with particle systems for eating dots, ghosts, and items. Entities also leave subtle visual trails.
 *   **High-Performance Rendering:** Uses the HTML5 Canvas API for smooth 60fps animations.
 *   **Procedural Audio:** Sound effects are generated in real-time using the **Web Audio API** (no external MP3/WAV assets required).
 *   **Reactive UI:** Seamlessly blends Canvas rendering with React for HUD, menus, and overlays.
@@ -59,7 +62,8 @@ This project serves as a showcase of "Game Development with React" patterns.
 *   **State Management:**
     *   **Game Logic:** A pure TypeScript `GameEngine` class handles collision detection, AI pathfinding, and score calculation.
     *   **UI State:** React Hooks (`useState`, `useRef`) manage high-level application states (Menu, Playing, Game Over).
-*   **AI:** Ghosts use target-based pathfinding behavior (Chase, Scatter, Frightened modes).
+*   **AI:** Ghosts utilize target-based pathfinding behavior with distinct personalities: AGGRESSIVE (chases), AMBUSH (intercepts), and RANDOM (unpredictable). Levels also feature 'Chaos Escalation', adding more ghosts as difficulty increases.
+*   **Game Flow:** Each level or life begins with a 2.5-second 'Ready... Go!' countdown, temporarily freezing gameplay to allow for player preparation.
 *   **Styling:** Tailwind CSS for UI overlays.
 
 ### Architecture Highlight
