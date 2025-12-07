@@ -1,6 +1,9 @@
+<div align="center">
+<img width="1200" height="475" alt="Neon Maze Banner" src="public/banner.svg" />
+</div>
+
 # Neon Maze
 
-![Neon Maze Banner](public/banner.svg)
 [![Play Now on Google AI Studio](https://img.shields.io/badge/Play_Now-on_AI_Studio-green?style=for-the-badge&logo=google)](https://ai.studio/apps/drive/1vCMNUg6BbhXntZn1VAftSxvkYgvo-NWk?fullscreenApplet=true)
 
 **Neon Maze** is a retro-futuristic arcade maze runner built with **React** and **TypeScript**. 
