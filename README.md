@@ -14,8 +14,6 @@ Neon Maze brings the classic "eat the dots" arcade gameplay to the modern browse
 
 The game features a custom physics and state engine completely decoupled from the React view layer, ensuring smooth gameplay even on lower-end devices.
 
-**Play it live!** You can play Neon Maze directly in your browser: [https://ai.studio/apps/drive/1irNj61KtrVi2XUJ70XwpJkQ7cak9ugHS?fullscreenApplet=true](https://ai.studio/apps/drive/1irNj61KtrVi2XUJ70XwpJkQ7cak9ugHS?fullscreenApplet=true)
-
 ## Features
 *   **Classic Gameplay Loop:** Collect all pellets to win, avoid ghosts, and use power pellets to turn the tables.
 *   **High-Performance Rendering:** Uses the HTML5 Canvas API for smooth 60fps animations.
