@@ -1,0 +1,60 @@
+<svg width="800" height="300" viewBox="0 0 800 300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Glow Filters -->
+    <filter id="neon-blue" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0  0 0 0 0 0.8  0 0 0 0 1  0 0 0 1 0" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="neon-pink" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 1  0 0 0 0 0  0 0 0 0 0.8  0 0 0 1 0" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#050510;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a1a2e;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="300" fill="url(#bg-grad)" />
+
+  <!-- Grid Pattern (Maze Wall Hints) -->
+  <g stroke="#1a2a40" stroke-width="2">
+    <path d="M0 50 H800 M0 100 H800 M0 150 H800 M0 200 H800 M0 250 H800" />
+    <path d="M50 0 V300 M100 0 V300 M150 0 V300 M200 0 V300 M600 0 V300 M650 0 V300 M700 0 V300 M750 0 V300" />
+  </g>
+
+  <!-- Title Text -->
+  <text x="400" y="140" font-family="'Courier New', monospace" font-size="80" font-weight="bold" fill="#0ff" text-anchor="middle" filter="url(#neon-blue)" letter-spacing="4">
+    NEON MAZE
+  </text>
+  <text x="400" y="180" font-family="'Courier New', monospace" font-size="24" fill="#f0f" text-anchor="middle" filter="url(#neon-pink)" letter-spacing="2">
+    RUNNER
+  </text>
+
+  <!-- Decorative Elements -->
+  <!-- Pac-Man style Player -->
+  <circle cx="150" cy="150" r="30" fill="#ffcc00" filter="url(#neon-blue)">
+    <animate attributeName="opacity" values="0.8;1;0.8" dur="2s" repeatCount="indefinite" />
+  </circle>
+  <path d="M150 150 L180 130 L180 170 Z" fill="#050510" />
+
+  <!-- Ghosts -->
+  <path d="M650 150 a25,25 0 0 1 50,0 v30 l-8.3 -10 l-8.3 10 l-8.3 -10 l-8.3 10 l-8.3 -10 l-8.3 10 Z" fill="#ff0055" filter="url(#neon-pink)">
+    <animateTransform attributeName="transform" type="translate" values="0 0; 0 -10; 0 0" dur="1.5s" repeatCount="indefinite" />
+  </path>
+  
+  <circle cx="665" cy="145" r="5" fill="white" />
+  <circle cx="685" cy="145" r="5" fill="white" />
+  <circle cx="667" cy="145" r="2" fill="blue" />
+  <circle cx="683" cy="145" r="2" fill="blue" />
+
+</svg>
